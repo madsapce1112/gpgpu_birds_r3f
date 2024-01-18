@@ -33,3 +33,8 @@ body {
 .custom-background {
   background-image: radial-gradient(circle, rgb(255, 255, 255), rgb(175, 174, 174), rgb(85, 84, 84));
 }
+
+/* * {
+  box-sizing: border-box;
+  cursor: none;
+} */
