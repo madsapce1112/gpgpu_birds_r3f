@@ -1,8 +1,10 @@
 import * as THREE from 'three'
 import React, { useRef, useMemo, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Instance, Instances, useGLTF } from '@react-three/drei'
+import { Instance, Instances, useAnimations, useGLTF } from '@react-three/drei'
 import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
+type FlockProps = { count: number; model: string; scale: number; position: any }
 
 type GLTFResult = GLTF & {
   nodes: any
@@ -141,11 +143,25 @@ function runFlocking(particle: any, particles: string | any[], index: number, mo
   }
 }
 
-const Fish = ({ particle, particles, aspect, mouse, i }: { particle: any; particles: any; aspect: number; mouse: any; i: number }) => {
+const Fish = ({
+  particle,
+  particles,
+  aspect,
+  mouse,
+  i,
+  scale = 1
+}: {
+  particle: any
+  particles: any
+  aspect: number
+  mouse: any
+  i: number
+  scale: number
+}) => {
   const mesh = useRef<THREE.InstancedMesh>(null)
   useFrame((state) => {
     if (mesh.current) {
-      let mousePosition = new THREE.Vector3(mouse.current[0] / aspect, -mouse.current[1] / aspect, 0)
+      let mousePosition = new THREE.Vector3(mouse[0] / aspect, -mouse[1] / aspect, mouse[3])
 
       let { timeSpeed, maxVelocity } = particle
 
@@ -155,10 +171,10 @@ const Fish = ({ particle, particles, aspect, mouse, i }: { particle: any; partic
       particle.accelleration.y = 0
       particle.accelleration.z = 0
 
-      runFlocking(particle, particles, i, mousePosition, mouse.current[2])
+      runFlocking(particle, particles, i, mousePosition, mouse[2])
 
       //Make sure our particles don't change direction too quickly
-      particle.accelleration.multiplyScalar(0.15)
+      particle.accelleration.multiplyScalar(0.015)
 
       particle.velocity.multiplyScalar(0.999)
       particle.velocity.add(particle.accelleration)
@@ -171,7 +187,7 @@ const Fish = ({ particle, particles, aspect, mouse, i }: { particle: any; partic
 
       let velocityScale = particle.velocity.length() / maxVelocity
 
-      mesh.current.scale.set(velocityScale * 30, 30 * velocityScale, 30 * velocityScale)
+      mesh.current.scale.set(velocityScale * scale, velocityScale * scale, velocityScale * scale)
 
       let lookTarget = mesh.current.position.clone()
       lookTarget.add(particle.velocity)
@@ -184,11 +200,11 @@ const Fish = ({ particle, particles, aspect, mouse, i }: { particle: any; partic
   return <Instance ref={mesh} />
 }
 
-export function Flock({ count, mouse }: { count: number; mouse: any }) {
+export function Flock({ count, model, scale, position }: FlockProps) {
   const { size, viewport } = useThree()
   const aspect = size.width / viewport.width
 
-  const { nodes, materials, animations } = useGLTF('/glb/angelfish.glb') as GLTFResult
+  const { nodes, materials, animations } = useGLTF(model) as GLTFResult
 
   // Generate some random positions, speed factors and timings
   const particles = useMemo(() => {
@@ -216,9 +232,11 @@ export function Flock({ count, mouse }: { count: number; mouse: any }) {
     return temp
   }, [count])
 
-  // useEffect(() => {
-  //   animations[names[0]]!.play()
-  // })
+  const { actions, names } = useAnimations(animations)
+
+  useEffect(() => {
+    actions[names[0]]?.play()
+  })
   // // The innards of this hook will run every frame
 
   return (
@@ -226,7 +244,7 @@ export function Flock({ count, mouse }: { count: number; mouse: any }) {
       <Instances
         geometry={nodes.object.geometry}
         range={count}
-        material={materials['M_angelfish']}>
+        material={materials['material']}>
         <group position={[0, 0, 0]}>
           {particles.map((particle, i) => (
             <Fish
@@ -234,7 +252,8 @@ export function Flock({ count, mouse }: { count: number; mouse: any }) {
               particle={particle}
               particles={particles}
               aspect={aspect}
-              mouse={mouse}
+              mouse={position}
+              scale={scale}
               i={i}
             />
           ))}

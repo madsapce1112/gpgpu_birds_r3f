@@ -24,6 +24,8 @@ export default function Home() {
       mouse.current[2] = false
     }
   }
+
+  console.log(mouse)
   return (
     <div
       className="h-screen w-screen bg-gray-900"
@@ -32,10 +34,13 @@ export default function Home() {
       onPointerUp={handleMouseUp}>
       <Suspense fallback={null}>
         <Canvas camera={{ fov: 75, position: [0, 0, 70] }}>
-          <ambientLight intensity={2} />
+          <ambientLight intensity={5} />
+          {/* <OrbitControls enableZoom={false} /> */}
           <Flock
-            mouse={mouse}
-            count={100}
+            position={[100, 10, 0]}
+            count={50}
+            model="/glb/blue_whale.glb"
+            scale={1}
           />
           <StatsGl />
         </Canvas>
