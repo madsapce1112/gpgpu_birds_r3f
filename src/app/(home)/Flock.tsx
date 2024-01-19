@@ -1,6 +1,13 @@
 import * as THREE from 'three'
-import React, { useRef, useMemo } from 'react'
-import { extend, useFrame, useThree } from '@react-three/fiber'
+import React, { useRef, useMemo, useEffect } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
+import { Instance, Instances, useGLTF } from '@react-three/drei'
+import { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js'
+
+type GLTFResult = GLTF & {
+  nodes: any
+  materials: any
+}
 
 //returns a vector towards a point, slows down as we near it
 function seek(particle: { position: any; velocity: any; maxVelocity: any; maxForce: any }, target: THREE.Vector3) {
@@ -134,22 +141,64 @@ function runFlocking(particle: any, particles: string | any[], index: number, mo
   }
 }
 
+const Fish = ({ particle, particles, aspect, mouse, i }: { particle: any; particles: any; aspect: number; mouse: any; i: number }) => {
+  const mesh = useRef<THREE.InstancedMesh>(null)
+  useFrame((state) => {
+    if (mesh.current) {
+      let mousePosition = new THREE.Vector3(mouse.current[0] / aspect, -mouse.current[1] / aspect, 0)
+
+      let { timeSpeed, maxVelocity } = particle
+
+      particle.t += timeSpeed
+
+      particle.accelleration.x = 0
+      particle.accelleration.y = 0
+      particle.accelleration.z = 0
+
+      runFlocking(particle, particles, i, mousePosition, mouse.current[2])
+
+      //Make sure our particles don't change direction too quickly
+      particle.accelleration.multiplyScalar(0.15)
+
+      particle.velocity.multiplyScalar(0.999)
+      particle.velocity.add(particle.accelleration)
+      particle.velocity.clampScalar(-maxVelocity, maxVelocity)
+
+      particle.position.add(particle.velocity)
+
+      // Update the dummy object
+      mesh.current.position.set(particle.position.x, particle.position.y, particle.position.z)
+
+      let velocityScale = particle.velocity.length() / maxVelocity
+
+      mesh.current.scale.set(velocityScale * 30, 30 * velocityScale, 30 * velocityScale)
+
+      let lookTarget = mesh.current.position.clone()
+      lookTarget.add(particle.velocity)
+
+      mesh.current.lookAt(lookTarget)
+      mesh.current.updateMatrix()
+      // And apply the matrix to the instanced item
+    }
+  })
+  return <Instance ref={mesh} />
+}
+
 export function Flock({ count, mouse }: { count: number; mouse: any }) {
-  const mesh = useRef<THREE.InstancedMesh<THREE.BufferGeometry<THREE.NormalBufferAttributes>, THREE.Material | THREE.Material[]>>(null)
-  const light = useRef<THREE.PointLight>(null)
   const { size, viewport } = useThree()
   const aspect = size.width / viewport.width
 
-  const dummy = useMemo(() => new THREE.Object3D(), [])
+  const { nodes, materials, animations } = useGLTF('/glb/angelfish.glb') as GLTFResult
+
   // Generate some random positions, speed factors and timings
   const particles = useMemo(() => {
     const temp = []
     for (let i = 0; i < count; i++) {
-      const t = Math.random() * 100
+      const t = Math.random() * 1000
       const timeSpeed = (0.01 + Math.random() / 200) / 2
       const velocity = new THREE.Vector3(0.5 - Math.random(), 0.5 - Math.random(), 0.5 - Math.random())
       const position = new THREE.Vector3((0.5 - Math.random()) * 100, (0.5 - Math.random()) * 100, (0.5 - Math.random()) * 100)
-      const maxVelocity = 1.0 + Math.random() * 0.5
+      const maxVelocity = 0.5 + Math.random() * 0.5
       const maxForce = 0.1
       const accelleration = new THREE.Vector3(0, 0, 0)
       const loopStep = 0
@@ -166,83 +215,31 @@ export function Flock({ count, mouse }: { count: number; mouse: any }) {
     }
     return temp
   }, [count])
+
+  // useEffect(() => {
+  //   animations[names[0]]!.play()
+  // })
   // // The innards of this hook will run every frame
-  useFrame((state) => {
-    if (light.current && mesh.current) {
-      let mousePosition = new THREE.Vector3(mouse.current[0] / aspect, -mouse.current[1] / aspect, 0)
-
-      light.current.position.set(mousePosition.x, mousePosition.y, mousePosition.z)
-
-      particles.forEach((particle, i) => {
-        let { timeSpeed, maxVelocity } = particle
-
-        particle.t += timeSpeed
-
-        particle.accelleration.x = 0
-        particle.accelleration.y = 0
-        particle.accelleration.z = 0
-
-        runFlocking(particle, particles, i, mousePosition, mouse.current[2])
-
-        //Make sure our particles don't change direction too quickly
-        particle.accelleration.multiplyScalar(0.15)
-
-        particle.velocity.multiplyScalar(0.999)
-        particle.velocity.add(particle.accelleration)
-        particle.velocity.clampScalar(-maxVelocity, maxVelocity)
-
-        particle.position.add(particle.velocity)
-
-        // Update the dummy object
-        dummy.position.set(particle.position.x, particle.position.y, particle.position.z)
-
-        let velocityScale = particle.velocity.length() / maxVelocity
-
-        dummy.scale.set(velocityScale, velocityScale, 5 * velocityScale)
-
-        let lookTarget = dummy.position.clone()
-        lookTarget.add(particle.velocity)
-
-        dummy.lookAt(lookTarget)
-        dummy.updateMatrix()
-        // And apply the matrix to the instanced item
-        mesh.current.setMatrixAt(i, dummy.matrix)
-      })
-      mesh.current.instanceMatrix.needsUpdate = true
-    }
-  })
 
   return (
     <>
-      <pointLight
-        ref={light}
-        distance={30}
-        intensity={5}
-        color="#FFCC66">
-        <mesh>
-          <sphereGeometry
-            attach="geometry"
-            args={[2.5, 32, 32]}
-          />
-          <meshBasicMaterial
-            attach="material"
-            color="#FFCC66"
-          />
-        </mesh>
-      </pointLight>
-      <instancedMesh
-        ref={mesh}
-        args={[undefined, undefined, count]}>
-        <boxGeometry
-          attach="geometry"
-          args={[1.5, 0]}
-        />
-        <meshStandardMaterial
-          attach="material"
-          wireframe={true}
-          color="white"
-        />
-      </instancedMesh>
+      <Instances
+        geometry={nodes.object.geometry}
+        range={count}
+        material={materials['M_angelfish']}>
+        <group position={[0, 0, 0]}>
+          {particles.map((particle, i) => (
+            <Fish
+              key={i}
+              particle={particle}
+              particles={particles}
+              aspect={aspect}
+              mouse={mouse}
+              i={i}
+            />
+          ))}
+        </group>
+      </Instances>
     </>
   )
 }

@@ -2,7 +2,7 @@
 import { Canvas } from '@react-three/fiber'
 import { Suspense, useCallback, useRef } from 'react'
 import { Flock } from './Flock'
-import { OrbitControls } from '@react-three/drei'
+import { OrbitControls, StatsGl } from '@react-three/drei'
 
 export default function Home() {
   const mouse = useRef([0, 0, false])
@@ -33,11 +33,11 @@ export default function Home() {
       <Suspense fallback={null}>
         <Canvas camera={{ fov: 75, position: [0, 0, 70] }}>
           <ambientLight intensity={2} />
-
           <Flock
             mouse={mouse}
-            count={600}
+            count={100}
           />
+          <StatsGl />
         </Canvas>
       </Suspense>
     </div>
